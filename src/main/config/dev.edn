@@ -1,0 +1,16 @@
+{#_:taoensso.timbre/logging-config
+                             #_{:level :debug
+                              :appenders {:spit (taoensso.timbre/spit-appender
+                                                 {:fname "/Users/pdenno/my-file.log"})}}
+
+ :dev true
+ :port         3000
+ ;; when :nrepl-port is set the application starts the nREPL server on load
+ :nrepl-port   7000
+ :jupyter-port 8888
+ :jupyter-token                                 "abde0968-838f-4697-a95d-0ab24c68c0e4"
+ :gateway-client-params {:query-params {"token" "abde0968-838f-4697-a95d-0ab24c68c0e4"}
+                         :accept :json
+                         :redirect-strategy :none
+                         :cookie-policy :standard}}
+ 

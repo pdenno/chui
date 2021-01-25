@@ -1,0 +1,17 @@
+/target
+/classes
+/checkouts
+/.shadow-cljs/jar-manifest
+/.shadow-cljs/cli-repl.port
+/.shadow-cljs/server.pid
+/.shadow-cljs/socket-repl.port
+profiles.clj
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+.hgignore
+.hg/
+*~
