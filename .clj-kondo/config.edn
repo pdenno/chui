@@ -1,0 +1,9 @@
+;;; https://github.com/borkdude/clj-kondo/blob/master/doc/config.md
+{:lint-as {mount.core/defstate                          clj-kondo.lint-as/def-catch-all
+           com.wsscode.pathom.connect/defresolver       clj-kondo.lint-as/def-catch-all
+           com.wsscode.pathom.connect/defmutation       clj-kondo.lint-as/def-catch-all
+           com.fulcrologic.fulcro.mutations/defmutation clj-kondo.lint-as/def-catch-all 
+           com.fulcrologic.guardrails.core/>defn        clojure.core/defn
+           com.fulcrologic.fulcro.components/defsc      clojure.core/defn
+           app.model.mmp/defparse                       clj-kondo.lint-as/def-catch-all}}
+
