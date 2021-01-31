@@ -5,6 +5,12 @@
 /.shadow-cljs/cli-repl.port
 /.shadow-cljs/server.pid
 /.shadow-cljs/socket-repl.port
+/.clj-kondo/.cache
+/node_modules
+/.cpcache/
+/node_modules/
+/.shadow-cljs/
+/resources/public/js/
 profiles.clj
 pom.xml
 pom.xml.asc
