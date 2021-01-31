@@ -1,7 +1,7 @@
 (ns app.server.http-server
   (:require
    [clojure.pprint :refer [pprint]]
-   [app.model.schema-db]
+   [app.model.db]
    [app.server.config :refer [config]]
    [app.server.middleware :refer [middleware]]
    [mount.core :refer [defstate]]

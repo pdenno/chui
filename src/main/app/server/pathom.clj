@@ -1,6 +1,6 @@
 (ns app.server.pathom
   (:require
-   [app.model.schema-db :as schema-db]
+   [app.model.db :as db]
    [app.server.config :refer [config]]
    [clojure.core.async :as async :refer [<!!]]
    [com.wsscode.pathom.connect :as pc :refer [defresolver]]
@@ -21,7 +21,7 @@
      (update ::pc/index-mutations
        #(into {} (map (fn [[k v]] [k (dissoc v ::pc/mutate)])) %)))})
 
-(def all-resolvers [index-explorer schema-db/resolvers])
+(def all-resolvers [index-explorer db/resolvers])
 
 (defn preprocess-parser-plugin
   "Helper to create a plugin that can view/modify the env/tx of a

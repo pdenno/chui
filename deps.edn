@@ -8,7 +8,6 @@
            com.fulcrologic/fulcro              {:mvn/version "3.4.14"}
            com.fulcrologic/fulcro-garden-css   {:mvn/version "3.0.8"}
            com.fulcrologic/semantic-ui-wrapper {:mvn/version "2.0.1"}
-           com.fulcrologic/guardrails          {:mvn/version "1.1.3"}  ; POD Shouldn't this go into :dev ?
            garden/garden                       {:mvn/version "1.3.10"} ; Convert clj(s) to CSS
            hiccup/hiccup                       {:mvn/version "1.0.5"}
            http-kit/http-kit                   {:mvn/version "2.5.1"}
@@ -22,7 +21,7 @@
            com.cemerick/url               {:mvn/version "0.1.1"}
            com.taoensso./timbre           {:mvn/version "5.1.0"}
            cprop/cprop                    {:mvn/version "0.1.17"} ; Environment variables, etc. 
-           io.replikativ/datahike         {:mvn/version "0.3.2"}  ; POD problem with 0.3.3 Issue entered 2021-01-22
+           io.replikativ/datahike         {:mvn/version "0.3.3"}
            org.clojure/data.zip           {:mvn/version "1.0.0"}
            org.clojure/data.json          {:mvn/version "1.0.0"}
            ;; https://stackoverflow.com/questions/21743532/why-doesnt-clojure-data-xml-return-xml-namespaces-when-parsing-a-rdf-file
@@ -49,7 +48,7 @@
                        :extra-deps  {org.clojure/clojurescript   {:mvn/version "1.10.773"}
                                      thheller/shadow-cljs        {:mvn/version "2.11.14"}
                                      expound/expound             {:mvn/version "0.8.7"}
-                                     fulcrologic/fulcro-spec     {:mvn/version "3.1.9"}
+                                     fulcrologic/fulcro-spec     {:mvn/version "3.1.9"} ; NOT com.fulcrologic
+                                     com.fulcrologic/guardrails  {:mvn/version "1.1.3"}
                                      binaryage/devtools          {:mvn/version "1.0.2"}
-                                     #_#_com.github.awkay/workspaces {:mvn/version "1.0.0-RC4"}
                                      org.clojure/tools.namespace {:mvn/version "1.1.0"}}}}}
