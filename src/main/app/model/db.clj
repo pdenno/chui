@@ -22,7 +22,7 @@
    [taoensso.timbre              :as log]))
 
 (def db-cfg {:store {:backend :file :path "resources/database"}
-             :rebuild-db? false
+             :rebuild-db? true
              :schema-flexibility :write})
 
 (def diag (atom nil))
@@ -120,20 +120,22 @@
                 message-schema-r
                 current-system-time-r])
 
+(defn process-files! [])
+
 ;;;================================ Starting and Stopping ===========================================
 ;;; (user/restart) whenever you update the DB or the resolvers. (tools/refresh) if compilation fails.
 (defn create-db!
   "Create the database if :rebuild? is true, otherwise just set the connection atom, conn."
   []
-  (alter-var-root (var conn) (fn [_] (d/connect db-cfg)))
-  (when (:rebuild-db? db-cfg)
+  (if (:rebuild-db? db-cfg)
     (binding [log/*config* (assoc log/*config* :min-level :info)]
       (d/delete-database db-cfg)
       (d/create-database db-cfg)
       (alter-var-root (var conn) (fn [_] (d/connect db-cfg)))
       (d/transact conn db-schema)
-      #_(process-files!)
-      (log/info "Created schema DB"))))
+      (process-files!)
+      (log/info "Created schema DB"))
+    (alter-var-root (var conn) (fn [_] (d/connect db-cfg)))))
 
 (defstate db
   :start

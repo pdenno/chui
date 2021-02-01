@@ -41,6 +41,7 @@
         (fmid/wrap-transit-params   {:opts {:handlers util/transit-read-handlers}})
         (fmid/wrap-transit-response {:opts {:handlers util/transit-write-handlers}})
         (wrap-resource "public")
+        (wrap-resource "public/icons")
         (wrap-defaults (-> site-defaults
                            (assoc-in [:security :anti-forgery] false)
                            (assoc-in [:security :xss-protection :enable?] false)))

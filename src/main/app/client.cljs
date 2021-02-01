@@ -207,58 +207,45 @@
               ::target (swap! state (fn [s] (assoc s :root/target-schema ident)))))))
 
 ;;; POD Is there any point in adding :ui/id to app root? (I don't do it currently). I just push it on props.
-(defsc StructureSwitcher [this {:list/keys [schemas] :ui/keys [id displaying] :as props}]
-  {:query [:ui/id :ui/displaying {:list/schemas (comp/get-query SchemaListItem)}]
-   :ident :ui/id
-   :initial-state (fn [p] {:ui/id (:ui/id p) :ui/displaying [:sdb/schema-id :placeholder]})}
-  (div
-   (dom/select
-    :.ui.search.dropdown
-    {:onChange (fn [arg]
-                 (comp/transact!
-                  this
-                  `[(set-schema {:sdb/schema-id ~(js/parseInt (.. arg -target -value))
-                                 :ui/id ~id})]))}
-    (into [(dom/option {:key 0 :value ""}
-                       (if (= id ::source)
-                         "Select Source Schema"
-                         "Select Target Schema"))]
-          (mapv ui-schema-list-item schemas)))
-   (if (= [:sdb/schema-id :placeholder] displaying)
-     (ui-structure-placeholder {})
-     (case id
-       ::source (ui-schema-structure {:sdb/schema-id (-> APP ::app/state-atom deref :root/source-schema second)})
-       ::target (ui-schema-structure {:sdb/schema-id (-> APP ::app/state-atom deref :root/target-schema second)})))))
+(defsc Board [this {:ui/keys [id] :as props}]
+  {:query [:ui/id]
+   :ident :ui/id}
+  (let [white "#f5e9dc"
+        black "#7f6f6f"] ; "#9fc4c4c"
+    (div :.ui.celled.table
+         (dom/tbody 
+          (dom/tr
+           (dom/td {:style {:width "64" :height "64" :background black}})
+           (dom/td
+            {:style {:padding "0"}}
+            (dom/button {:style  { :border "0" :width "64" :height "64" :background white}}
+                        (dom/img {:src "knight.svg" :height "50" :width "50"})))
+           (dom/td {:style {:width "64" :height "64" :background black}})
+           (dom/td
+            {:style {:padding "0"}}
+            (dom/button {:style { :border "0" :width "64" :height "64" :background white}}
+                        (dom/img {:src "knight.svg" :height "50" :width "50"})))
+           (dom/td "2")
+           (dom/td "2")
+           (dom/td "1")
+           (dom/td "2"))
+          (dom/tr
+           (dom/td "1")
+           (dom/td {:style {:width "64" :height "64" :background black}})
+           (dom/td "1")
+           (dom/td "2")
+           (dom/td "1")
+           (dom/td "2")
+           (dom/td "1")
+           (dom/td "2"))))))
 
-(def ui-structure-switcher (comp/factory StructureSwitcher {:keyfn :ui/id}))
+(def ui-board (comp/factory Board))
 
-(defsc Root [_ {:keys [person-of-interest] :as props}]
-  {:query [{:root/menu-source [:list/id {:list/schemas [:sdb/schema-id :schema/name]}]}
-           {:root/source-schema (comp/get-query StructureSwitcher {:ui/id ::source})} ; POD just a guess!
-           {:root/target-schema (comp/get-query StructureSwitcher {:ui/id ::target})}
-           {:person-of-interest (comp/get-query Person)}]
-   :initial-state (fn [_] {:root/source-schema (:ui/displaying (comp/get-initial-state StructureSwitcher {:ui/id ::source})),
-                           :root/target-schema (:ui/displaying (comp/get-initial-state StructureSwitcher {:ui/id ::target})),
-                           :person-of-interest (comp/get-initial-state Person)})}
-  (div :.ui.container ; This supposedly restricts the size to 1127px on desktops; it does restrict, but not that much.
-       (ui-goal-modal {:ui/modal-id "TenQuestions"})
-       (div :.ui.two.column.grid
-            (div :.ui.column ; value of :root/menu-source is the *map* described by the query!
-                   (dom/div :.treemenu.boxed (ui-person person-of-interest))
-                 #_(ui-structure-switcher (-> (:root/menu-source props)
-                                            (assoc :ui/id ::source)
-                                            (assoc :person-of-interest (comp/get-query Person))
-                                            (assoc :ui/displaying (:root/source-schema props)))))
-            (div :.ui.column
-                 (ui-structure-switcher (-> (:root/menu-source props)
-                                            (assoc :ui/id ::target)
-                                            (assoc :ui/displaying (:root/target-schema props))))))
-            ;; POD this codemirror instance will become a singleton component [:component/id ::Editor]
-       (div :.ui.row (ui-code-mirror editor-props))
-       (div :.ui.two.column.grid
-            (div :.ui.column (ui-code-mirror {:value "source data"   :options {:lineNumbers true}}))
-            (div :.ui.column (ui-code-mirror {:value "target output" :options {:lineNumbers true}})))))
-
+(defsc Root [_ {:root/keys [board] :as props}]
+  {:query [:root/board]}
+  (div :.ui.container
+       (dom/h1 "Chui")
+       (ui-board {:ui/id :board})))
 
 (defsc SchemaListInfo [_ {:list/keys [id]}]
   {:query [:list/id {:list/schemas (comp/get-query SchemaListItem)}]

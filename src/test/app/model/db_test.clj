@@ -5,7 +5,7 @@
    [datahike.api                 :as d]
    [datahike.pull-api            :as dp]))
 
-(def conn (d/connect db/db-cfg))
+;(def conn (d/connect db/db-cfg))
 
 ;;; Currently unused is (:cct/ObjectClass :cct/PrimitiveType :cct/UsageRule :cct/components
 ;;;  :cct/sc-id :cct/sc-type :cct/sc-use :cct/supplemental :component/doc-string :schema/codes)
