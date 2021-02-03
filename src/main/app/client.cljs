@@ -206,50 +206,97 @@
               ::source (swap! state (fn [s] (assoc s :root/source-schema ident)))
               ::target (swap! state (fn [s] (assoc s :root/target-schema ident)))))))
 
+(defn square-coords
+  "Return a vector of two integers [file rank] given an id string."
+  [id]
+  (let [file2num {\a 1 \b 2 \c 3 \d 4 \e 5 \f 6 \g 7 \h 8}]
+    (vector
+     (-> id name (get 0) file2num)
+     (-> id name (get 1) js/parseInt))))
+
+(def std-start
+  {:a1 #:square{:player :white :piece :rook}
+   :b1 #:square{:player :white :piece :knight}
+   :c1 #:square{:player :white :piece :bishop}
+   :d1 #:square{:player :white :piece :queen}
+   :e1 #:square{:player :white :piece :king}
+   :f1 #:square{:player :white :piece :bishop}
+   :g1 #:square{:player :white :piece :knight}
+   :h1 #:square{:player :white :piece :rook}
+   :a2 #:square{:player :white :piece :pawn}
+   :b2 #:square{:player :white :piece :pawn}
+   :c2 #:square{:player :white :piece :pawn}
+   :d2 #:square{:player :white :piece :pawn}
+   :e2 #:square{:player :white :piece :pawn}
+   :f2 #:square{:player :white :piece :pawn}
+   :g2 #:square{:player :white :piece :pawn}
+   :h2 #:square{:player :white :piece :pawn}
+
+   :a8 #:square{:player :black :piece :rook}
+   :b8 #:square{:player :black :piece :knight}
+   :c8 #:square{:player :black :piece :bishop}
+   :d8 #:square{:player :black :piece :queen}
+   :e8 #:square{:player :black :piece :king}
+   :f8 #:square{:player :black :piece :bishop}
+   :g8 #:square{:player :black :piece :knight}
+   :h8 #:square{:player :black :piece :rook}
+   :a7 #:square{:player :black :piece :pawn}
+   :b7 #:square{:player :black :piece :pawn}
+   :c7 #:square{:player :black :piece :pawn}
+   :d7 #:square{:player :black :piece :pawn}
+   :e7 #:square{:player :black :piece :pawn}
+   :f7 #:square{:player :black :piece :pawn}
+   :g7 #:square{:player :black :piece :pawn}
+   :h7 #:square{:player :black :piece :pawn}})
+
+(def board-squares
+  (vec (for [irank (map str (range 1 9))
+             ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+         (keyword (str ifile irank)))))
+
+(defsc Square [this {:square/keys [id player piece free?] :as props}]
+  {:query [:square/id :square/player :square/piece :square/free?]
+   :ident :square/id
+   :initial-state (fn [p] (std-start (:square/id p)))}
+  (let [[x y] (square-coords id)
+        white "#f5e9dc"
+        black "#8f7f7f"]
+    (dom/td
+     {:style {:padding "0"}}
+     (dom/button {:style  {:border "0" :width "64" :height "64"
+                           :background (if (odd? (+ x y)) black white)}}
+                 #_(dom/img {:src "knight-with-white.svg" :height "50" :width "50"})))))
+
+(def ui-square (comp/factory Square {:keyfn :square/id}))
+
 ;;; POD Is there any point in adding :ui/id to app root? (I don't do it currently). I just push it on props.
-(defsc Board [this {:ui/keys [id] :as props}]
-  {:query [:ui/id]
-   :ident :ui/id}
-  (let [white "#f5e9dc"
-        black "#7f6f6f"] ; "#9fc4c4c"
+(defsc Board [this {:board/keys [id state] :as props}]
+  {:query [:board/id {:board/state (comp/get-query Square)}]
+   :ident :board/id
+   :initial-state (fn [_] {:board/state
+                           (reduce (fn [m id]
+                                     (assoc m id (comp/get-initial-state Square {:square/id id})))
+                                   {}
+                                   board-squares)})}
     (div :.ui.celled.table
          (dom/tbody 
-          (dom/tr
-           (dom/td {:style {:width "64" :height "64" :background black}})
-           (dom/td
-            {:style {:padding "0"}}
-            (dom/button {:style  { :border "0" :width "64" :height "64" :background white}}
-                        (dom/img {:src "knight.svg" :height "50" :width "50"})))
-           (dom/td {:style {:width "64" :height "64" :background black}})
-           (dom/td
-            {:style {:padding "0"}}
-            (dom/button {:style { :border "0" :width "64" :height "64" :background white}}
-                        (dom/img {:src "knight.svg" :height "50" :width "50"})))
-           (dom/td "2")
-           (dom/td "2")
-           (dom/td "1")
-           (dom/td "2"))
-          (dom/tr
-           (dom/td "1")
-           (dom/td {:style {:width "64" :height "64" :background black}})
-           (dom/td "1")
-           (dom/td "2")
-           (dom/td "1")
-           (dom/td "2")
-           (dom/td "1")
-           (dom/td "2"))))))
-
+             (for [irank (map str (range 1 9))]
+               (dom/tr
+                (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+                  (ui-square :square/id (keyword (str ifile irank)))))))))
+                  
 (def ui-board (comp/factory Board))
 
+;;; (. (. js/document -body) -clientHeight)
+;;; (. (. js/document -body) -clientWidth)
+
 (defsc Root [_ {:root/keys [board] :as props}]
-  {:query [:root/board]}
+  {:query [:root/board]
+   :initial-state (fn [_] {:root/game-start (:board/state (comp/get-initial-state Board {:board/id ::board}))
+                           :root/game-moves []})}
   (div :.ui.container
        (dom/h1 "Chui")
-       (ui-board {:ui/id :board})))
-
-(defsc SchemaListInfo [_ {:list/keys [id]}]
-  {:query [:list/id {:list/schemas (comp/get-query SchemaListItem)}]
-   :ident (fn [] [:list/id id])})
+       (ui-board {:board/id ::board})))
 
 ;;; POD, this reloads initial-state on first call. Subsequent calls don't change the DB.
 ;;; Hypothesis about how the df/load! works:
@@ -258,9 +305,6 @@
 ;;;  The response from this query supplies the other argument, list/schema as evident from the query. 
 (defn ^:export init []
   (app/mount! APP Root "app")
-  ;; I know I'll still want to go back and investigate why this isn't called with [:list/id :message-schema]
-  ;; but it follows the pattern of the "friends" list demo in the book. 
-  (df/load! APP :message-schema SchemaListInfo {:target [:root/menu-source]}) ; First arg is instance, third is ComponentType
   (js/console.log "Loaded"))
 
 ;;; POD This defines what is to be done when the file is saved.

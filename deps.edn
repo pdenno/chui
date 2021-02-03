@@ -16,17 +16,13 @@
            ring/ring-core                      {:mvn/version "1.8.2"}
            ring/ring-defaults                  {:mvn/version "0.3.2"}
 
-           ;; Supporting the chui proper. 
-           cheshire/cheshire              {:mvn/version "5.10.0"}
+           ;; Supporting Chui proper. 
            com.cemerick/url               {:mvn/version "0.1.1"}
            com.taoensso./timbre           {:mvn/version "5.1.0"}
            cprop/cprop                    {:mvn/version "0.1.17"} ; Environment variables, etc. 
            io.replikativ/datahike         {:mvn/version "0.3.3"}
            org.clojure/data.zip           {:mvn/version "1.0.0"}
-           org.clojure/data.json          {:mvn/version "1.0.0"}
-           ;; https://stackoverflow.com/questions/21743532/why-doesnt-clojure-data-xml-return-xml-namespaces-when-parsing-a-rdf-file
-           org.clojure/data.xml           {:mvn/version "0.2.0-alpha6"}} ; Original from nb-agent, namespace aware.
-
+           org.clojure/data.json          {:mvn/version "1.0.0"}}
  :aliases {:clj-tests {:extra-paths ["src/test"]
                        :main-opts   ["-m" "kaocha.runner"]
                        :extra-deps  {lambdaisland/kaocha {:mvn/version "1.0.732"}}}
