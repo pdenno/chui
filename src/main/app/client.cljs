@@ -92,128 +92,6 @@
           (log/info "I would run a function here? some-text=" some-text)
           #_(-> js/document (.getElementById "TenQuestions"))))
 
-;;; Note how this uses the backpointer to :sdb/elem-id !
-(defsc SchemaPart [_this {:sdb/keys [elem-id] :schema-part/keys [name min-occurs max-occurs] :as props}]
-  {:query [:sdb/elem-id :schema-part/name :schema-part/type :schema-part/min-occurs :schema-part/max-occurs]
-   :ident :sdb/elem-id #_(fn [] [:sdb/elem-id (:sdb/elem-id props)])} ;<================= SIMPLIFY ????
-  (div {:id elem-id} (str elem-id name min-occurs max-occurs)))
-
-(def ui-schema-part (comp/factory SchemaPart {:keyfn :sdb/elem-id})) ; Everything that you map over should have a :keyfn.
-
-(defn elem-path [id] [:sdb/elem-id id])
-(defn add-elem [state-map id elem] (assoc-in state-map (elem-path id) elem))
-
-;;; Calling a fm/defmutation returns a list that looks like a function call.
-;;; (add-schema-property {:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"})
-;;; ==> (app.client/add-schema-property {:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"})
-;;; It also registers this as a multi-method. To really make use of it, you call it with comp/transact!
-;;; transact! submits from the UI an abstract operation that may have local and/or remote effects to your application.
-;;; (comp/transact! app [(add-schema-property {:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"})])
-;;; can also call "remote" and "rest" from here.
-
-;;; Here is the query I would make: 
-;;;[{[:sdb/schema-id 1229]
-;;;  [{:schema/components
-;;;    [:component/doc-string
-;;;     :component/name
-;;;     :component/type
-;;;     :component/min-occurs
-;;;     :component/max-occurs]}]}]
-
-(defsc StructurePlaceholder [_ {:ui/keys [id]}]
-  {:query [:ui/id]
-   :ident :ui/id}
-  (div :.ui.placeholder.segment
-       (div :.ui.field
-            (dom/label {:style {:color "red"}} "Make a selection above."))))
-
-(def ui-structure-placeholder (comp/factory StructurePlaceholder))
-
-(defsc SchemaStructure [_ {:sdb/keys [schema-id] :as props}]
-  {:query [:sdb/schema-id {:schema/message-sequence (comp/get-query SchemaPart)}]
-   :ident :sdb/schema-id
-   :initial-state {:sdb/schema-id :placeholder}}
-  (div :.ui.field
-       (dom/label (str "Rendering schema " schema-id))))
-
-(def ui-schema-structure (comp/factory SchemaStructure {:keyfn :sdb/schema-id}))
-;;;======================================================================
-;;; Keep this for my fulcro.org notes!
-(defn make-person
-  "Make a person data map with optional children."
-  [id name children]
-  (cond-> {:db/id id :person/name name}
-    children (assoc :person/children children)))
-
-(declare ui-person)
-
-; The ... in the query means there will be children of the same type, of arbitrary depth
-; it is equivalent to (comp/get-query Person), but calling get query on yourself would
-; lead to infinite compiler recursion.
-(defsc Person [this {:keys [:person/name :db/id :person/children] :as props}] ; POD added :db/id here
-  {:query         (fn [] [:db/id :person/name {:person/children '...}]) ; db/id was always here (not my doing).
-   :initial-state (fn [p]
-                    (make-person 1 "Joe"
-                      [(make-person 2 "Suzy" [])
-                       (make-person 3 "Billy" [])
-                       (make-person 4 "Rae"
-                         [(make-person 5 "Ian"
-                            [(make-person 6 "Zoe" [])])])]))
-   :ident         :db/id #_[:person/id :db/id]} ; <============================ Bug here? Just a renaming???
-  (log/info "Person props = " props)
-    (dom/div :.ui.accordion ; :.ui.styled.accordion is not interesting; it puts a rectangle around it. 
-    (dom/div :.active.title        ; :.active.title points it downward. 
-       (dom/i :.dropdown.icon) ; gives it the arrow
-       (str name id))
-    (dom/div :.active.content  ; must be .active to show
-       (dom/p #_:.transition.visible (str "The name is " name))
-       (when (seq children) ; ul gives it the indentation.
-         (dom/ul (map (fn [p] (ui-person p)) children)))))
-  #_(dom/div
-    (dom/h4 name)
-    (when (seq children)
-      (dom/div
-        (dom/ul
-          (map (fn [p]
-                 (ui-person p))
-            children))))))
-
-(def ui-person (comp/factory Person {:keyfn :db/id}))
-
-;;;======================================================================
-(defsc SchemaListItem [_ {:keys [sdb/schema-id schema/name]}]
-  {:query [:sdb/schema-id :schema/name] 
-   :ident :sdb/schema-id}
-  ;; Since mapping over these (see SourceSchema below), they should have a unique :key. 
-  (dom/option {:key (str schema-id) :value (str schema-id)} name)) 
-
-(def ui-schema-list-item (comp/factory SchemaListItem {:keyfn :sdb/schema-id}))
-
-(def editor-props {:value "function myScript(){return 100;}\n"
-                   :onChange (fn [_ _ text] (js/console.log (str "New text = " text)))
-                   :options {:lineNumbers true
-                             :inputStyle "contenteditable"
-                             :theme "material" ;"ambiance"
-                             :mode "javascript"}})
-
-;;; (get-query SchemaPart) ==> [:schema-elem/id :schema/property-name :schema/min-occurs :schema/max-occurs]
-;;; This is working in as far as the DB is updated, but it isn't causing SourceStructure to update. 
-(fm/defmutation set-schema [{:sdb/keys [schema-id] :ui/keys[id]}]
-  (action [{:keys [state]}]
-          (let [ident [:sdb/schema-id schema-id]]
-            (df/load! APP ident SchemaStructure)
-            (case id
-              ::source (swap! state (fn [s] (assoc s :root/source-schema ident)))
-              ::target (swap! state (fn [s] (assoc s :root/target-schema ident)))))))
-
-(defn square-coords
-  "Return a vector of two integers [file rank] given an id string."
-  [id]
-  (let [file2num {\a 1 \b 2 \c 3 \d 4 \e 5 \f 6 \g 7 \h 8}]
-    (vector
-     (-> id name (get 0) file2num)
-     (-> id name (get 1) js/parseInt))))
-
 (def std-start
   {:a1 #:square{:player :white :piece :rook}
    :b1 #:square{:player :white :piece :knight}
@@ -254,10 +132,22 @@
              ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
          (keyword (str ifile irank)))))
 
-(defsc Square [this {:square/keys [id player piece free?] :as props}]
-  {:query [:square/id :square/player :square/piece :square/free?]
+(defn square-coords
+  "Return a vector of two integers [file rank] given an id string."
+  [id]
+  (let [file2num {\a 1 \b 2 \c 3 \d 4 \e 5 \f 6 \g 7 \h 8}]
+    (vector
+     (-> id name (get 0) file2num)
+     (-> id name (get 1) js/parseInt))))
+
+(defsc Square [this {:square/keys [id player piece] :as props}]
+  {:query [:square/id :square/player :square/piece]
    :ident :square/id
-   :initial-state (fn [p] (std-start (:square/id p)))}
+   :initial-state (fn [p] ; can't use props (above) here. 
+                    (let [{:square/keys [player piece]} (std-start (:square/id p))]
+                      (cond-> {:square/id (:square/id p)}
+                        player (assoc :square/player player)
+                        piece  (assoc :square/piece  piece))))}
   (let [[x y] (square-coords id)
         white "#f5e9dc"
         black "#8f7f7f"]
@@ -269,30 +159,28 @@
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
 
-;;; POD Is there any point in adding :ui/id to app root? (I don't do it currently). I just push it on props.
-(defsc Board [this {:board/keys [id state] :as props}]
-  {:query [:board/id {:board/state (comp/get-query Square)}]
+(defsc Board [this props #_{:board/keys [id board-state] :as props}]
+  {:query [:board/id {:board/board-state (comp/get-query Square)}]
    :ident :board/id
-   :initial-state (fn [_] {:board/state
-                           (reduce (fn [m id]
-                                     (assoc m id (comp/get-initial-state Square {:square/id id})))
-                                   {}
-                                   board-squares)})}
+   :initial-state
+   (fn [_] {:board/board-state (reduce (fn [m id] (assoc m id (comp/get-initial-state Square {:square/id id})))
+                                       {}
+                                       board-squares)})}
     (div :.ui.celled.table
          (dom/tbody 
              (for [irank (map str (range 1 9))]
                (dom/tr
                 (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-                  (ui-square :square/id (keyword (str ifile irank)))))))))
+                  (ui-square {:square/id (keyword (str ifile irank))})))))))
                   
 (def ui-board (comp/factory Board))
 
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
 
-(defsc Root [_ {:root/keys [board] :as props}]
-  {:query [:root/board]
-   :initial-state (fn [_] {:root/game-start (:board/state (comp/get-initial-state Board {:board/id ::board}))
+(defsc Root [_ props]
+  {:query [:root/game-moves :board/board-state]
+   :initial-state (fn [_] {:board/board-state (:board/board-state (comp/get-initial-state Board {:board/id ::board}))
                            :root/game-moves []})}
   (div :.ui.container
        (dom/h1 "Chui")
@@ -305,6 +193,7 @@
 ;;;  The response from this query supplies the other argument, list/schema as evident from the query. 
 (defn ^:export init []
   (app/mount! APP Root "app")
+  (df/load! APP :server/time nil {:target [:root/game-start-time]})
   (js/console.log "Loaded"))
 
 ;;; POD This defines what is to be done when the file is saved.
@@ -312,5 +201,4 @@
   ;; re-mounting will cause forced UI refresh
   (app/mount! APP Root "app")
   ;; 3.3.0+ Make sure dynamic queries are refreshed
-  (comp/refresh-dynamic-queries! APP)
   (js/console.log "Hot reload"))

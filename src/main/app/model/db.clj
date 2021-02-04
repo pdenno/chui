@@ -42,6 +42,9 @@
 ;;; See also person-resolver at Part 6, 43:26.
 ;;; For debugging
 
+(defn tryme [eql] ((var-get (resolve 'app.server.pathom/parser)) {} eql))
+;;;(tryme [:server/time])
+
 ;;; Note that when you send an Ident, you get back a map with that ident and the response <=========
 ;;;(tryme [{[:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"] [:sdb/schema-id]}])
 ;;; ==> {[:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"] #:sdb{:schema-id 1230}}
