@@ -1,14 +1,12 @@
 (ns app.client
   (:require
-   ;;[app.application :refer [APP]] ; POD Should this be APP ? No. Don't worry about it quite yet.
-   ["react-codemirror2" :rename {UnControlled CodeMirror}]
    [com.fulcrologic.fulcro.application :as app]
    [com.fulcrologic.fulcro.components :as comp :refer [defsc]]
    [com.fulcrologic.fulcro.routing.legacy-ui-routers :as r :refer [defsc-router]]
    [com.fulcrologic.fulcro.data-fetch :as df]
    [com.fulcrologic.fulcro.dom :as dom :refer [div]]
    [com.fulcrologic.fulcro.networking.http-remote :as http]
-   [com.fulcrologic.fulcro.algorithms.react-interop :as interop]
+   [com.fulcrologic.fulcro.algorithms.denormalize :as fdn] ; fdn/db->tree (see also fnorm/tree->db).
    [taoensso.timbre :as log]
    [com.fulcrologic.fulcro.algorithms.merge :as merge]
    [com.fulcrologic.fulcro.mutations :as fm #_:refer #_[defmutation]]
@@ -43,9 +41,10 @@
 ;;;     (close over) 'this' and props from the defsc argument list.
 ;;; (9) For :ident, a literal keyword is an abreviation. For example :sdb/schema-id is an abreviation of
 ;;;     [:sdb/schema-id :sdb/schema-id] where the first element is a literal and the second is the name
-;;;     of the property to pul from props. 
+;;;     of the property to pul from props.
+;;; (10) Don't make deep Pathom queries; normalize.
+;;; (11) Don't specify :initial-state for thing you are going to df/load!
 
-(def ui-code-mirror (interop/react-factory CodeMirror))
 (def diag (atom nil))
 
 (defonce APP (app/fulcro-app
@@ -72,6 +71,11 @@
 
 (def ui-goal-modal (comp/factory GoalModal))
 
+(fm/defmutation run-test-modal [{:keys [some-text]}]
+  (action [{:keys [state]}] ; This is typically what you want to do locally. Binding to the state db.
+          (log/info "I would run a function here? some-text=" some-text)
+          #_(-> js/document (.getElementById "TenQuestions"))))
+
 ;;; (aget (-> js/document (.getElementById "TenQuestions")) "click")
 
 ;;; NOTE: $ is an alias for jQuery(). $("#test") gets the test div.
@@ -87,54 +91,12 @@
 ;;;		closable: true
 ;;;	});
 ;;;});
-(fm/defmutation run-test-modal [{:keys [some-text]}]
-  (action [{:keys [state]}] ; This is typically what you want to do locally. Binding to the state db.
-          (log/info "I would run a function here? some-text=" some-text)
-          #_(-> js/document (.getElementById "TenQuestions"))))
 
-(def std-start
-  {:a1 #:square{:player :white :piece :rook}
-   :b1 #:square{:player :white :piece :knight}
-   :c1 #:square{:player :white :piece :bishop}
-   :d1 #:square{:player :white :piece :queen}
-   :e1 #:square{:player :white :piece :king}
-   :f1 #:square{:player :white :piece :bishop}
-   :g1 #:square{:player :white :piece :knight}
-   :h1 #:square{:player :white :piece :rook}
-   :a2 #:square{:player :white :piece :pawn}
-   :b2 #:square{:player :white :piece :pawn}
-   :c2 #:square{:player :white :piece :pawn}
-   :d2 #:square{:player :white :piece :pawn}
-   :e2 #:square{:player :white :piece :pawn}
-   :f2 #:square{:player :white :piece :pawn}
-   :g2 #:square{:player :white :piece :pawn}
-   :h2 #:square{:player :white :piece :pawn}
-
-   :a8 #:square{:player :black :piece :rook}
-   :b8 #:square{:player :black :piece :knight}
-   :c8 #:square{:player :black :piece :bishop}
-   :d8 #:square{:player :black :piece :queen}
-   :e8 #:square{:player :black :piece :king}
-   :f8 #:square{:player :black :piece :bishop}
-   :g8 #:square{:player :black :piece :knight}
-   :h8 #:square{:player :black :piece :rook}
-   :a7 #:square{:player :black :piece :pawn}
-   :b7 #:square{:player :black :piece :pawn}
-   :c7 #:square{:player :black :piece :pawn}
-   :d7 #:square{:player :black :piece :pawn}
-   :e7 #:square{:player :black :piece :pawn}
-   :f7 #:square{:player :black :piece :pawn}
-   :g7 #:square{:player :black :piece :pawn}
-   :h7 #:square{:player :black :piece :pawn}})
-
-(def board-squares
-  (vec (for [irank (map str (range 1 9))
-             ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-         (keyword (str ifile irank)))))
-
+;;;========================================== CHUI =============================================
 (defn square-coords
   "Return a vector of two integers [file rank] given an id string."
   [id]
+  (log/info "square-coords, id=" id)
   (let [file2num {\a 1 \b 2 \c 3 \d 4 \e 5 \f 6 \g 7 \h 8}]
     (vector
      (-> id name (get 0) file2num)
@@ -142,58 +104,62 @@
 
 (defsc Square [this {:square/keys [id player piece] :as props}]
   {:query [:square/id :square/player :square/piece]
-   :ident :square/id
-   :initial-state (fn [p] ; can't use props (above) here. 
-                    (let [{:square/keys [player piece]} (std-start (:square/id p))]
-                      (cond-> {:square/id (:square/id p)}
-                        player (assoc :square/player player)
-                        piece  (assoc :square/piece  piece))))}
-  (let [[x y] (square-coords id)
-        white "#f5e9dc"
-        black "#8f7f7f"]
-    (dom/td
-     {:style {:padding "0"}}
-     (dom/button {:style  {:border "0" :width "64" :height "64"
-                           :background (if (odd? (+ x y)) black white)}}
-                 #_(dom/img {:src "knight-with-white.svg" :height "50" :width "50"})))))
+   :ident :square/id}
+  (when id
+    (let [[x y] (square-coords id)
+          white "#f5e9dc"
+          black "#8f7f7f"]
+      (dom/td
+       {:style {:padding "0"}}
+       (dom/button {:style  {:border "0" :width "64" :height "64"
+                             :background (if (odd? (+ x y)) black white)}}
+                   (when (and (= player :black) (= piece :knight))
+                     (dom/img {:src "knight-with-white.svg" :height "50" :width "50"})))))))
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
 
-(defsc Board [this props #_{:board/keys [id board-state] :as props}]
-  {:query [:board/id {:board/board-state (comp/get-query Square)}]
-   :ident :board/id
-   :initial-state
-   (fn [_] {:board/board-state (reduce (fn [m id] (assoc m id (comp/get-initial-state Square {:square/id id})))
-                                       {}
-                                       board-squares)})}
-    (div :.ui.celled.table
-         (dom/tbody 
-             (for [irank (map str (range 1 9))]
-               (dom/tr
-                (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-                  (ui-square {:square/id (keyword (str ifile irank))})))))))
-                  
+;;; This was necessary to avoid errors about things in a list not have an ID.
+;;; Specifying {:id (str "rank-" irank)} on dom/tr didn't help!
+(defsc Rank [_ {:rank/keys [id]}]
+  :ident :rank/id
+  (dom/tr 
+   (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+     (let [id (keyword (str ifile id))]
+       (when-let [sq (-> APP ::app/state-atom deref :square/id id)] 
+         (ui-square sq))))))
+
+(def ui-rank (comp/factory Rank {:keyfn :rank/id}))
+
+(defsc Board [_ _]
+  {:query [{:board/start (comp/get-query Square)}] ; Straight to square; Rank doesn't matter!
+   :ident (fn [] [:board/id ::board])}
+  (dom/table
+   (dom/tbody 
+    (for [irank (map str (range 1 9))]
+      (ui-rank {:rank/id irank})))))
+
 (def ui-board (comp/factory Board))
 
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
-
-(defsc Root [_ props]
-  {:query [:root/game-moves :board/board-state]
-   :initial-state (fn [_] {:board/board-state (:board/board-state (comp/get-initial-state Board {:board/id ::board}))
-                           :root/game-moves []})}
+;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here. 
+(defsc Root [_ _]
+  {:query [{:board/start (comp/get-query Board)}]
+   :initial-state (fn [_] {:game/turn :white ; Don't put here things df/load!-ed. 
+                           :game/move 1
+                           :game/history []})}
   (div :.ui.container
        (dom/h1 "Chui")
        (ui-board {:board/id ::board})))
 
-;;; POD, this reloads initial-state on first call. Subsequent calls don't change the DB.
-;;; Hypothesis about how the df/load! works:
-;;;  SourceSchema (likewise TargetSchema) is identified (:ident) by :list/id, so that a query can be made:
-;;;  [{:message-schema [:list/id {:list/schemas [:sdb/schema-id :schema/name]}]}]
-;;;  The response from this query supplies the other argument, list/schema as evident from the query. 
+;;; POD, On the first call, this loads things that you want to be in the initial state.
+;;; Subsequent calls don't change the DB.
 (defn ^:export init []
   (app/mount! APP Root "app")
-  (df/load! APP :server/time nil {:target [:root/game-start-time]})
+  ;; Don't specify :initial-state for anything you intend to df/load! from the server!
+  ;; Use (e.g. Board) to normalize. Use target to put it on the root.
+  (df/load! APP :board/start Board {:target [:board/start]})
+  (df/load! APP :server/time nil   {:target [:game/start-time]}) ; nil means don't normalize.
   (js/console.log "Loaded"))
 
 ;;; POD This defines what is to be done when the file is saved.

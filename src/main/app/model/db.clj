@@ -21,6 +21,9 @@
    [clojure.tools.namespace.repl :as tools :refer [refresh]] ; for debugging
    [taoensso.timbre              :as log]))
 
+;;; Owen's point: Black can't move a piece that would open up his own king to attack (the piece is "pinned"). 
+;;;               Therefore white's king sometimes can move to places he could not otherwise move to.
+
 (def db-cfg {:store {:backend :file :path "resources/database"}
              :rebuild-db? true
              :schema-flexibility :write})
@@ -31,7 +34,11 @@
 (def db-schema
   "Defines the datahike schema for this database.
      :db/db.cardinality=many means value is a vector of values of some :db.type."
-  [#:db{:cardinality :db.cardinality/one,  :valueType :db.type/boolean, :ident :mm/file-not-read?}])
+   [#:db{:cardinality :db.cardinality/one,  :valueType :db.type/boolean, :ident :mm/file-not-read?}
+    #:db{:cardinality :db.cardinality/one,  :valueType :db.type/keyword, :ident :square/id :unique :db.unique/identity}
+    #:db{:cardinality :db.cardinality/one,  :valueType :db.type/keyword, :ident :square/player}
+    #:db{:cardinality :db.cardinality/one,  :valueType :db.type/keyword, :ident :square/piece}
+    #:db{:cardinality :db.cardinality/many, :valueType :db.type/ref,     :ident :board/standard-start}])
 
 ;;;================================ Communication with Clients =========================================
 ;;; I think the key idea here for pathom-mediated composabiltiy is for each resolver to rename all db/id 
@@ -43,87 +50,63 @@
 ;;; For debugging
 
 (defn tryme [eql] ((var-get (resolve 'app.server.pathom/parser)) {} eql))
-;;;(tryme [:server/time])
 
-;;; Note that when you send an Ident, you get back a map with that ident and the response <=========
-;;;(tryme [{[:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"] [:sdb/schema-id]}])
-;;; ==> {[:schema/name "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"] #:sdb{:schema-id 1230}}
-(pc/defresolver schema-by-name-r [env {:schema/keys [name]}]
-  {::pc/input #{:schema/name}
-   ::pc/output [:sdb/schema-id]}
-  {:sdb/schema-id (d/q `[:find ?e . :where [?e :schema/name ~name]] @conn)})
+;;; (tryme [:game/state])
+;;; (tryme [{:game/state [:square/id :square/piece :square/player]}]) ; same thing
+;;; This one only returns information where there is a piece.
+;;; THIS IS GOING TO HAVE TO CHANGE TO KNOW WHERE IN THE GAME WE ARE! (If I'm even going to keep it.)
+(pc/defresolver game-state-r [_ _]
+  {::pc/output [{:game/state [:square/id :square/piece :square/player]}]}
+  {:game/state
+   (d/q '[:find ?id ?piece ?player
+          :keys square/id square/piece square/player
+          :where
+          [?x :square/id ?id]
+          [?x :square/piece ?piece]
+          [?x :square/player ?player]]
+        @conn)})
 
-;;; This is based on the book. https://book.fulcrologic.com/#GoingRemote (See friends-resolver
-;;; (tryme [{:message-schema [:list/id  {:list/schemas [:sdb/schema-id :schema/name]}]}]) ; RIGHT!
-;;; (tryme [{[:list/id :message-schema] {:list/schemas [:sdb/schema-id :schema/name]}}])  ; WRONG! WHY?
-(pc/defresolver list-r [env {:list/keys [id]}] ; e.g :list/id = :message-schema
-  {::pc/input  #{:list/id}
-   ::pc/output [{:list/schemas [:sdb/schema-id :schema/name]}]}
-  (when (= id :message-schema)
-    (when-let [schema-maps (->>
-                            (d/q `[:find ?ent ?name ?topic
-                                   :keys sdb/schema-id schema/name schema/topic
-                                   :where
-                                   [?ent :schema/name  ?name]
-                                   [?ent :schema/topic ?topic]
-                                   [?ent :schema/type ~id]]
-                                 @conn)
-                            (sort-by :schema/topic)
-                            (mapv #(dissoc % :schema/topic))
-                            not-empty)]
-      {:list/id id
-       :list/schemas schema-maps})))
+;;; (tryme [:board/start]) ; Just gives IDs
+;;; (tryme [{:board/start [:square/id :square/player :square/piece]}]) ; uses composition with square-start-r
+(pc/defresolver board-start-r [_ _]
+  {::pc/output [{:board/start [:square/id]}]}
+  {:board/start
+   (reduce (fn [r v] (conj r (first v)))
+           [] 
+           (d/q '[:find (pull ?x [:square/id #_#_:square/piece :square/player])
+                  :where
+                  [_ :board/standard-start ?x]]
+                @conn))})
 
-(pc/defresolver message-schema-r [env input] ; THIS ONE WORKS (But...)
-  {::pc/output [{:message-schema [:list/id {:list/schemas [:schema/name :sdb/schema-id]}]}]}
-  {:message-schema {:list/id :message-schema}})
-
-;;; (tryme [{[:sdb/schema-id 1229] [{:schema/message-sequence [{:sdb/elem-id [:schema-part/doc-string :schema-part/name :schema-part/type :schema-part/min-occurs :schema-part/max-occurs]}]}]}])
-
-;;; (tryme [{[:sdb/schema-id 1229] [{:schema/message-sequence [:schema-part/doc-string :schema-part/name :schema-part/type :schema-part/min-occurs :schema-part/max-occurs]}]}])
-;;; (tryme [{[:sdb/schema-id 1229] [:schema/name]}])
-;;; (tryme [{[:sdb/schema-id 1229] [:schema/message-sequence]}])
-(pc/defresolver schema-props-r [env {:sdb/keys [schema-id]}]
-  {::pc/input #{:sdb/schema-id}
-   ::pc/output [:schema/name :sdb/schema-id :schema/sdo :schema/type :schema/topic 
-                :schema/subversion :schema/inline-typedefs :schema/spec
-                {:schema/imported-schemas [:sdb/imported-schema-id]}
-                {:schema/message-sequence [:sdb/elem-id]}]}
-  (-> (dp/pull @conn '[*] schema-id) ; POD could also do the :keys thing on the pull. 
-      (update :schema/message-sequence (fn [s] (mapv #(-> % (assoc :sdb/elem-id (:db/id %)) (dissoc :db/id)) s)))
-      (update :schema/imported-schemas
-              (fn [s]
-                (mapv #(-> %
-                           (assoc :sdb/imported-schema-id (:db/id %))
-                           (dissoc :db/id)) s)))))
-
-;;; (tryme [{[:sdb/elem-id 1280] [:schema/min-occurs]}])                          ; Simple
-;;; (tryme [{[:schema/name tname] [{[:sdb/elem-id 1280] [:schema/min-occurs]}]}]) ; YES!
-;;; (tryme [{[:schema/name tname] [{:schema/message-sequence [:schema-part/name :schema-part/type :schema-part/doc-string :schema-part/min-occurs :schema-part/max-occurs]}]}]) ; COMPLETE!
-;;; (tryme [{[:sdb/schema-id 1230] [{:schema/message-sequence [:schema-part/name :schema-part/type :schema-part/doc-string :schema-part/min-occurs :schema-part/max-occurs]}]}]) ; COMPLETE! 
-(pc/defresolver elem-props-r [env {:sdb/keys [elem-id]}]
-  {::pc/input #{:sdb/elem-id}
-   ::pc/output [:schema-part/doc-string
-                :schema-part/name
-                :schema-part/type
-                :schema-part/min-occurs
-                :schema-part/max-occurs]}
-  (dp/pull @conn '[*] elem-id))
+;;; (tryme [{:square/id :a1}])
+;;; (tryme [{[:square/id :a1] [:square/piece :square/id :square/player]}])
+(pc/defresolver square-start-r [_ {:square/keys [id]}]
+  {::pc/input #{:square/id}
+   ::pc/output [:square/id :square/piece :square/player]}
+  (when-let [info (d/q `[:find ?piece ?player
+                         :keys square/piece square/player
+                         :where
+                         [?x :square/id ~id]
+                         [?x :square/piece ?piece]
+                         [?x :square/player ?player]]
+                       @conn)]
+    (-> info first (assoc :square/id id))))
 
 ;;; Nice thing about pathom (relative to GraphQL) is that you don't have to start at the root.
-;;; This has nothing to do with ::pc/input; you can add this to a query anywhere. 
+;;; This has nothing to do with ::pc/input; you can add this to a query anywhere.
+;;; (tryme [:server/time])
 (pc/defresolver current-system-time-r [_ _]
   {::pc/output [:server/time]}
   {:server/time (java.util.Date.)})
 
-(def resolvers [schema-by-name-r
-                schema-props-r
-                elem-props-r
-                list-r
-                message-schema-r
+(def resolvers [board-start-r
+                square-start-r
+                game-state-r
                 current-system-time-r])
 
-(defn process-files! [])
+(defn process-data! []
+  (d/transact conn [{:board/standard-start
+                     (-> "resources/data/standard-start.edn" slurp read-string)}]))
 
 ;;;================================ Starting and Stopping ===========================================
 ;;; (user/restart) whenever you update the DB or the resolvers. (tools/refresh) if compilation fails.
@@ -136,7 +119,7 @@
       (d/create-database db-cfg)
       (alter-var-root (var conn) (fn [_] (d/connect db-cfg)))
       (d/transact conn db-schema)
-      (process-files!)
+      (process-data!)
       (log/info "Created schema DB"))
     (alter-var-root (var conn) (fn [_] (d/connect db-cfg)))))
 
