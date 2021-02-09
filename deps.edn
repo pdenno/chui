@@ -1,11 +1,11 @@
 {:paths   ["src/main" "resources"]
 
- :deps    {org.clojure/clojure                 {:mvn/version "1.10.1"}
+ :deps    {org.clojure/clojure                 {:mvn/version "1.10.2"}
            bidi/bidi                           {:mvn/version "2.1.6"}
            bk/ring-gzip                        {:mvn/version "0.3.0"}
            com.taoensso/tufte                  {:mvn/version "2.2.0"}
            com.wsscode/pathom                  {:mvn/version "2.3.1"}
-           com.fulcrologic/fulcro              {:mvn/version "3.4.14"}
+           com.fulcrologic/fulcro              {:mvn/version "3.4.16"}
            com.fulcrologic/fulcro-garden-css   {:mvn/version "3.0.8"}
            com.fulcrologic/semantic-ui-wrapper {:mvn/version "2.0.1"}
            garden/garden                       {:mvn/version "1.3.10"} ; Convert clj(s) to CSS
@@ -13,12 +13,12 @@
            http-kit/http-kit                   {:mvn/version "2.5.1"}
            mount/mount                         {:mvn/version "0.1.16"}
            org.clojure/core.async              {:mvn/version "1.3.610"}
-           ring/ring-core                      {:mvn/version "1.8.2"}
+           ring/ring-core                      {:mvn/version "1.9.0"}
            ring/ring-defaults                  {:mvn/version "0.3.2"}
 
            ;; Supporting Chui proper. 
            com.cemerick/url               {:mvn/version "0.1.1"}
-           com.taoensso./timbre           {:mvn/version "5.1.0"}
+           com.taoensso./timbre           {:mvn/version "5.1.2"}
            cprop/cprop                    {:mvn/version "0.1.17"} ; Environment variables, etc. 
            io.replikativ/datahike         {:mvn/version "0.3.3"}
            org.clojure/data.zip           {:mvn/version "1.0.0"}
@@ -27,22 +27,18 @@
                        :main-opts   ["-m" "kaocha.runner"]
                        :extra-deps  {lambdaisland/kaocha {:mvn/version "1.0.732"}}}
            
-           ;; lately I am using -A:antq (See ~/.clojure/deps.edn), which looks through :dev and these aliases.
-           #_#_:outdated-old {:extra-deps {olical/depot {:mvn/version "1.8.4"}}
-                      :main-opts ["-m" "depot.outdated.main"]}
-
            :depstar {:replace-deps ; for generation of jars and uberjars
-                     {seancorfield/depstar {:mvn/version "2.0.165"}}
+                     {seancorfield/depstar {:mvn/version "2.0.171"}}
                      :ns-default hf.depstar :exec-args {}}
 
            ;; See https://github.com/clojure-emacs/cider-nrepl/blob/master/deps.edn for Emacs support --> 404
            ;; I have nothing here or in shadow-cljs.edn about cider. (Do in ~/.shadow-cljs/config.edn but not used?)
            ;; Anyway, maybe it is just ~/.dir-locals.el that I need something.
-           ;; Also, :outdated doesn't check these.
+           ;; Also, THE OLD clj -A:outdated doesn't check these.
            :dev       {:extra-paths ["src/test" "src/dev" "src/workspaces"]
                        :jvm-opts    ["-XX:-OmitStackTraceInFastThrow" "-Dconf=src/main/config/dev.edn"]
                        :extra-deps  {org.clojure/clojurescript   {:mvn/version "1.10.773"}
-                                     thheller/shadow-cljs        {:mvn/version "2.11.14"}
+                                     thheller/shadow-cljs        {:mvn/version "2.11.17"}
                                      expound/expound             {:mvn/version "0.8.7"}
                                      fulcrologic/fulcro-spec     {:mvn/version "3.1.9"} ; NOT com.fulcrologic
                                      com.fulcrologic/guardrails  {:mvn/version "1.1.3"}

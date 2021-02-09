@@ -66,16 +66,16 @@
           [?x :square/player ?player]]
         @conn)})
 
-;;; (tryme [:board/start]) ; Just gives IDs
-;;; (tryme [{:board/start [:square/id :square/player :square/piece]}]) ; uses composition with square-start-r
+;;; (tryme [:board/id {:board/start [:square/id :square/piece :square/player]}])
 (pc/defresolver board-start-r [_ _]
-  {::pc/output [{:board/start [:square/id]}]}
-  {:board/start
+  {::pc/output [:board/id {:board/start [:square/id :square/player :square/piece]}]}
+  {:board/id ::board
+   :board/start
    (reduce (fn [r v] (conj r (first v)))
            [] 
-           (d/q '[:find (pull ?x [:square/id #_#_:square/piece :square/player])
-                  :where
-                  [_ :board/standard-start ?x]]
+           (d/q '[:find (pull ?x [:square/id #_:square/piece #_:square/player]) ;<===== I add piece and player.
+                  :where                                                    ;<===== But composition for the query could do it
+                  [_ :board/standard-start ?x]]                             ;<===== (It was doing it!)
                 @conn))})
 
 ;;; (tryme [{:square/id :a1}])

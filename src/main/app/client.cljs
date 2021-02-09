@@ -44,6 +44,13 @@
 ;;;     of the property to pul from props.
 ;;; (10) Don't make deep Pathom queries; normalize.
 ;;; (11) Don't specify :initial-state for thing you are going to df/load!
+;;; (12) As it says in the minimalist guide:
+;;;      Don’t be mislead, the query is not a standalone query that could be "run" directly against the database
+;;;      (as you know from SQL or re-frame subscriptions). It is rather a query fragment, which only makes sense in
+;;;      the context of its parent’s query. Only the root componet’s properties are resolved directly against the
+;;;      client database or, when load!-ed, against global Pathom resolvers. A query such as [:person/id :person/fname] is
+;;;      meaningless on its own - which person? Only in the context of a parent, such
+;;;      as [{:all-people [<insert here>]}] (in an imaginary AllPeopleList component) does it make sense.
 
 (def diag (atom nil))
 
@@ -94,60 +101,53 @@
 
 ;;;========================================== CHUI =============================================
 (defn square-coords
-  "Return a vector of two integers [file rank] given an id string."
+  "Return a vector of two integers [rank file] given an id string."
   [id]
-  (log/info "square-coords, id=" id)
   (let [file2num {\a 1 \b 2 \c 3 \d 4 \e 5 \f 6 \g 7 \h 8}]
     (vector
-     (-> id name (get 0) file2num)
-     (-> id name (get 1) js/parseInt))))
+     (-> id name (get 1) js/parseInt)
+     (-> id name (get 0) file2num))))
 
-(defsc Square [this {:square/keys [id player piece] :as props}]
+(defsc Square [_ {:square/keys [id] :as props}]
   {:query [:square/id :square/player :square/piece]
    :ident :square/id}
-  (when id
-    (let [[x y] (square-coords id)
-          white "#f5e9dc"
-          black "#8f7f7f"]
-      (dom/td
-       {:style {:padding "0"}}
-       (dom/button {:style  {:border "0" :width "64" :height "64"
-                             :background (if (odd? (+ x y)) black white)}}
-                   (when (and (= player :black) (= piece :knight))
-                     (dom/img {:src "knight-with-white.svg" :height "50" :width "50"})))))))
+  (log/info "id=" id "player=" (:square/player props) "piece=" (:square/piece props))
+  (let [[x y] (square-coords id)
+        white "#f5e9dc"
+        black "#8f7f7f"]
+    (dom/td
+     {:style {:padding "0"}}
+     (dom/button {:style  {:border "0" :width "64" :height "64"
+                           :background (if (odd? (+ x y)) white black)}}
+                 (when (and (= (:square/player props) :black) (= (:square/piece props) :knight))
+                   (dom/img {:src "knight-with-white.svg" :height "50" :width "50"}))))))
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
 
-;;; This was necessary to avoid errors about things in a list not have an ID.
-;;; Specifying {:id (str "rank-" irank)} on dom/tr didn't help!
-(defsc Rank [_ {:rank/keys [id]}]
-  :ident :rank/id
-  (dom/tr 
-   (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-     (let [id (keyword (str ifile id))]
-       (when-let [sq (-> APP ::app/state-atom deref :square/id id)] 
-         (ui-square sq))))))
-
-(def ui-rank (comp/factory Rank {:keyfn :rank/id}))
-
-(defsc Board [_ _]
-  {:query [{:board/start (comp/get-query Square)}] ; Straight to square; Rank doesn't matter!
+(defsc Board [_ _ {:board/keys [id start]}]
+  {:query [:board/id {:board/start (comp/get-query Square)}]
    :ident (fn [] [:board/id ::board])}
-  (dom/table
-   (dom/tbody 
-    (for [irank (map str (range 1 9))]
-      (ui-rank {:rank/id irank})))))
+  (log/info "board/id=" id "board/start=" start) ; <============ board/id not communicated despite 
+  (dom/table :.ui.celled-table                   ; ============= (ui-board {:board/id ::board}) below. 
+   (apply dom/tbody 
+    (for [irank (range 8 0 -1)]
+      (apply dom/tr {:id irank} 
+             (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+               (let [id (keyword (str ifile irank))]
+                 (ui-square {:square/id id}))))))))
 
 (def ui-board (comp/factory Board))
 
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
 ;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here. 
-(defsc Root [_ _]
-  {:query [{:board/start (comp/get-query Board)}]
-   :initial-state (fn [_] {:game/turn :white ; Don't put here things df/load!-ed. 
-                           :game/move 1
-                           :game/history []})}
+(defsc Root [_ {:board/keys [id]}]
+  {:query [{:board/id {:board/start [:square/id :square/piece :square/player]}}]
+   :initial-state (fn [_] {}
+                    #_{:game/turn :white ; Don't put here things df/load!-ed.
+                       :game/move 1
+                       :game/history []})}
+  (log/info "In Root: id= " id) ;<====== THIS is really where things breakdown!!! (not like friends)
   (div :.ui.container
        (dom/h1 "Chui")
        (ui-board {:board/id ::board})))
@@ -158,8 +158,8 @@
   (app/mount! APP Root "app")
   ;; Don't specify :initial-state for anything you intend to df/load! from the server!
   ;; Use (e.g. Board) to normalize. Use target to put it on the root.
-  (df/load! APP :board/start Board {:target [:board/start]})
-  (df/load! APP :server/time nil   {:target [:game/start-time]}) ; nil means don't normalize.
+  (df/load! APP :server/time   nil {:target [:game/start-time]}) ; nil means don't normalize.
+  (df/load! APP [:board/id ::board] Board)
   (js/console.log "Loaded"))
 
 ;;; POD This defines what is to be done when the file is saved.
@@ -167,4 +167,5 @@
   ;; re-mounting will cause forced UI refresh
   (app/mount! APP Root "app")
   ;; 3.3.0+ Make sure dynamic queries are refreshed
+  (comp/refresh-dynamic-queries! APP)
   (js/console.log "Hot reload"))
