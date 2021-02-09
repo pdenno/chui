@@ -108,10 +108,9 @@
      (-> id name (get 1) js/parseInt)
      (-> id name (get 0) file2num))))
 
-(defsc Square [_ {:square/keys [id] :as props}]
+(defsc Square [_ {:square/keys [id player piece]}]
   {:query [:square/id :square/player :square/piece]
    :ident :square/id}
-  (log/info "id=" id "player=" (:square/player props) "piece=" (:square/piece props))
   (let [[x y] (square-coords id)
         white "#f5e9dc"
         black "#8f7f7f"]
@@ -119,38 +118,39 @@
      {:style {:padding "0"}}
      (dom/button {:style  {:border "0" :width "64" :height "64"
                            :background (if (odd? (+ x y)) white black)}}
-                 (when (and (= (:square/player props) :black) (= (:square/piece props) :knight))
+                 (when (and (= player :black) (= piece :knight))
                    (dom/img {:src "knight-with-white.svg" :height "50" :width "50"}))))))
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
 
-(defsc Board [_ _ {:board/keys [id start]}]
-  {:query [:board/id {:board/start (comp/get-query Square)}]
+;;; ?!?!? (comp/get-query Square) is NOT THE SAME as the literal below?!?!
+;;; Is this because some of the :piece and :player values are :fulcro/not-found?
+(defsc Board [_ props]
+  {:query [[:board/id ::board] {:board/start [:square/id :square/player :square/piece]}]
    :ident (fn [] [:board/id ::board])}
-  (log/info "board/id=" id "board/start=" start) ; <============ board/id not communicated despite 
-  (dom/table :.ui.celled-table                   ; ============= (ui-board {:board/id ::board}) below. 
-   (apply dom/tbody 
-    (for [irank (range 8 0 -1)]
-      (apply dom/tr {:id irank} 
-             (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-               (let [id (keyword (str ifile irank))]
-                 (ui-square {:square/id id}))))))))
+  (let [start (get-in props [[:board/id ::board] :board/start])]
+    (dom/table :.ui.celled-table                   
+      (apply dom/tbody 
+             (for [irank (range 8 0 -1)]
+               (apply dom/tr {:id irank} 
+                      (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+                        (let [id (keyword (str ifile irank))]
+                          (when-let [sqr (some #(when (= (:square/id %) id) %) start)]
+                            (ui-square sqr))))))))))
 
 (def ui-board (comp/factory Board))
 
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
 ;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here. 
-(defsc Root [_ {:board/keys [id]}]
-  {:query [{:board/id {:board/start [:square/id :square/piece :square/player]}}]
-   :initial-state (fn [_] {}
-                    #_{:game/turn :white ; Don't put here things df/load!-ed.
-                       :game/move 1
-                       :game/history []})}
-  (log/info "In Root: id= " id) ;<====== THIS is really where things breakdown!!! (not like friends)
+(defsc Root [_ props]
+  {:query [[:board/id ::board] {:board/start [:square/id :square/piece :square/player]}]
+   :initial-state (fn [_] {:game/turn :white ; Don't put here things df/load!-ed.
+                           :game/move 1
+                           :game/history []})}
   (div :.ui.container
        (dom/h1 "Chui")
-       (ui-board {:board/id ::board})))
+       (ui-board props)))
 
 ;;; POD, On the first call, this loads things that you want to be in the initial state.
 ;;; Subsequent calls don't change the DB.
