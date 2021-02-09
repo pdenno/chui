@@ -73,7 +73,7 @@
    :board/start
    (reduce (fn [r v] (conj r (first v)))
            [] 
-           (d/q '[:find (pull ?x [:square/id #_#_:square/piece :square/player]) ;<===== I add piece and player.
+           (d/q '[:find (pull ?x [:square/id :square/piece :square/player]) ;<===== I add piece and player.
                   :where                                                    ;<===== But composition for the query could do it
                   [_ :board/standard-start ?x]]                             ;<===== (It was doing it!)
                 @conn))})

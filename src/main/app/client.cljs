@@ -123,10 +123,8 @@
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
 
-;;; ?!?!? (comp/get-query Square) is NOT THE SAME as the literal below?!?!
-;;; Is this because some of the :piece and :player values are :fulcro/not-found?
 (defsc Board [_ props]
-  {:query [[:board/id ::board] {:board/start [:square/id :square/player :square/piece]}]
+  {:query [{:board/start (comp/get-query Square)}]
    :ident (fn [] [:board/id ::board])}
   (let [start (get-in props [[:board/id ::board] :board/start])]
     (dom/table :.ui.celled-table                   
@@ -142,9 +140,12 @@
 
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
-;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here. 
+;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here.
+;;; props are built from the query. They will be sent to ui-board, 
+;;; which is why they include the :square/id table. That info is needed.
 (defsc Root [_ props]
-  {:query [[:board/id ::board] {:board/start [:square/id :square/piece :square/player]}]
+  {:query [{[:board/id ::board] (comp/get-query Board)}
+           {:square/id (comp/get-query Square)}]
    :initial-state (fn [_] {:game/turn :white ; Don't put here things df/load!-ed.
                            :game/move 1
                            :game/history []})}
