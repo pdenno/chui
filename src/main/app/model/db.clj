@@ -73,14 +73,16 @@
    :board/start
    (reduce (fn [r v] (conj r (first v)))
            [] 
-           (d/q '[:find (pull ?x [:square/id :square/piece :square/player]) ;<===== I add piece and player.
-                  :where                                                    ;<===== But composition for the query could do it
-                  [_ :board/standard-start ?x]]                             ;<===== (It was doing it!)
+           (d/q '[:find (pull ?x [:square/id :square/piece :square/player])
+                  :where
+                  [_ :board/standard-start ?x]]
                 @conn))})
 
+;;; This may not be needed, seeing how I implemented board-start-r
+;;; Left here for reference since it uses :keys
 ;;; (tryme [{:square/id :a1}])
 ;;; (tryme [{[:square/id :a1] [:square/piece :square/id :square/player]}])
-(pc/defresolver square-start-r [_ {:square/keys [id]}]
+#_(pc/defresolver square-start-r [_ {:square/keys [id]}]
   {::pc/input #{:square/id}
    ::pc/output [:square/id :square/piece :square/player]}
   (when-let [info (d/q `[:find ?piece ?player
@@ -100,7 +102,7 @@
   {:server/time (java.util.Date.)})
 
 (def resolvers [board-start-r
-                square-start-r
+                #_square-start-r
                 game-state-r
                 current-system-time-r])
 

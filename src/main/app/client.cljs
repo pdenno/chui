@@ -14,8 +14,6 @@
    [goog.object :as gobj]))
 
 ;;; To remember:
-;;; (0) ??? The value of a destructured props can be a map defined by sc's the query. Or do I have it backwards?
-;;;     That is, does the query set up a binding of variables to maps representing nodes in the tree. 
 ;;; (1) It is an error to destructure something in props and not use it in the query. This is because
 ;;;     the purpose of the destructuring is to pick out what in the query path is relevant to the sc.
 ;;; (2) It is likewise an error for the :ident not to appear in the query.
@@ -118,7 +116,7 @@
      {:style {:padding "0"}}
      (dom/button {:style  {:border "0" :width "64" :height "64"
                            :background (if (odd? (+ x y)) white black)}}
-                 (when (and (= player :black) (= piece :knight))
+                 (when (and (= player :black) (= piece :knight)) ; this just for testing
                    (dom/img {:src "knight-with-white.svg" :height "50" :width "50"}))))))
 
 (def ui-square (comp/factory Square {:keyfn :square/id}))
@@ -128,13 +126,13 @@
    :ident (fn [] [:board/id ::board])}
   (let [start (get-in props [[:board/id ::board] :board/start])]
     (dom/table :.ui.celled-table                   
-      (apply dom/tbody 
-             (for [irank (range 8 0 -1)]
-               (apply dom/tr {:id irank} 
-                      (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
-                        (let [id (keyword (str ifile irank))]
-                          (when-let [sqr (some #(when (= (:square/id %) id) %) start)]
-                            (ui-square sqr))))))))))
+      (dom/tbody 
+       (for [irank (range 8 0 -1)]
+         (dom/tr {:key irank} 
+                 (for [ifile ["a" "b" "c" "d" "e" "f" "g" "h"]]
+                   (let [id (keyword (str ifile irank))]
+                     (when-let [sqr (some #(when (= (:square/id %) id) %) start)]
+                       (ui-square sqr))))))))))
 
 (def ui-board (comp/factory Board))
 
