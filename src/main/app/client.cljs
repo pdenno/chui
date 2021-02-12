@@ -13,60 +13,19 @@
    [com.fulcrologic.fulcro.inspect.inspect-client :as inspect]
    [goog.object :as gobj]))
 
-;;; To remember:
-;;; (1) It is an error to destructure something in props and not use it in the query. This is because
-;;;     the purpose of the destructuring is to pick out what in the query path is relevant to the sc.
-;;; (2) It is likewise an error for the :ident not to appear in the query.
-;;;     This is because it is otherwise impossible to say what part of the application's data the sc concerns.
-;;; (3) :query describes the shape of the data managed. It is NOT CLEAR whether it is necessary that some of
-;;;     that data has to be tied to the ::app/state-atom tree. In the recursive person example
-;;;     (see Section 6.9 Recursive Queries) only the root person is in ::app/state-atom. The rest is in :initial-state
-;;;     and never added to the atom. 
-;;; (4) Properties are always passed to a component factory as the first argument and are not optional"
-;;;     (exception in Chapter 17). Also my own exception: menu-source
-;;; (5) :initial-state sets state at the relative root (root of tree at the ident).
-;;; (6) When you do df/load! like this:
-;;;    (df/load! APP [:sdb/schema-id 1229] SourceStructure)
-;;;    It creates a pathom transaction like this (because it is uses information from the sc).
-;;;  [{[:sdb/schema-id 1229]
-;;;      [:sdb/elem-id
-;;;       :schema-part/name
-;;;       :schema-part/min-occurs
-;;;       :schema-part/max-occurs]}}]}]
-;;; (7) Every sc that should appear initially should have an :initial-state; compose these towards root.
-;;; (8) :ident, :query, and :initial state can all be specified as a function or template form.
-;;;     The template form has the advantage of sanity checking. The functional form of :ident can use
-;;;     (close over) 'this' and props from the defsc argument list.
-;;; (9) For :ident, a literal keyword is an abreviation. For example :sdb/schema-id is an abreviation of
-;;;     [:sdb/schema-id :sdb/schema-id] where the first element is a literal and the second is the name
-;;;     of the property to pul from props.
-;;; (10) Don't make deep Pathom queries; normalize.
-;;; (11) Don't specify :initial-state for thing you are going to df/load!
-;;; (12) As it says in the minimalist guide:
-;;;      Don’t be mislead, the query is not a standalone query that could be "run" directly against the database
-;;;      (as you know from SQL or re-frame subscriptions). It is rather a query fragment, which only makes sense in
-;;;      the context of its parent’s query. Only the root componet’s properties are resolved directly against the
-;;;      client database or, when load!-ed, against global Pathom resolvers. A query such as [:person/id :person/fname] is
-;;;      meaningless on its own - which person? Only in the context of a parent, such
-;;;      as [{:all-people [<insert here>]}] (in an imaginary AllPeopleList component) does it make sense.
-
-(def diag (atom nil))
-
 (defonce APP (app/fulcro-app
               {:remotes {:remote (http/fulcro-http-remote {})}}))
 
-;;; Sometimes it is best to just look at a JavaScript example!
-;;; https://dev.to/caicindy87/form-in-a-semantic-ui-react-modal-n5k
-(defsc GoalModal [this {:ui/keys [modal-id]}]
+(defsc GoalModal [this props]
   {:query [:ui/modal-id]
-   :ident (fn [] [:ui/modal-id (:ui/keys modal-id)])} ; <============== DOESN'T SEEM TO BE WHAT I'D WANT!
+   :ident (fn [] [:ui/modal-id ::test-modal])} 
   (div (dom/button :.ui.button.yellow.create_btn 
                    {:onClick (fn []
-                               (when-let [m #_(gobj/get this modal-id) (-> js/document (.getElementById modal-id))]
-                                 (log/info "modal = " m)
-                                 (.modal m "show")))} ; See https://semantic-ui.com/modules/modal.html#/usage
+                               (when-let [m (-> js/document (.getElementById "test-modal"))]
+                                 (log/info "Button click modal = " m)
+                                 (.show m "show")))} ; See https://semantic-ui.com/modules/modal.html#/usage
                    "Test Modal")
-       (div :.ui.modal {:id modal-id} 
+       (div :.ui.modal#test-modal 
             (div :.description
                  (div :.ui.header "I am wondering how this works...")
                  (dom/p "...and I'm trying a few things."))
@@ -81,7 +40,7 @@
           (log/info "I would run a function here? some-text=" some-text)
           #_(-> js/document (.getElementById "TenQuestions"))))
 
-;;; (aget (-> js/document (.getElementById "TenQuestions")) "click")
+;;; (aget (-> js/document (.getElementById "test-modal")) "click")
 
 ;;; NOTE: $ is an alias for jQuery(). $("#test") gets the test div.
 ;;; In jQuery, the class and ID selectors are the same as in CSS.
@@ -149,6 +108,7 @@
                            :game/history []})}
   (div :.ui.container
        (dom/h1 "Chui")
+       (ui-goal-modal {:modal/id "test-modal"})
        (ui-board props)))
 
 ;;; POD, On the first call, this loads things that you want to be in the initial state.
