@@ -11,52 +11,28 @@
    [com.fulcrologic.fulcro.algorithms.merge :as merge]
    [com.fulcrologic.fulcro.mutations :as fm #_:refer #_[defmutation]]
    [com.fulcrologic.fulcro.inspect.inspect-client :as inspect]
+   [com.fulcrologic.semantic-ui.modules.modal.ui-modal :refer [ui-modal]]
    [goog.object :as gobj]))
 
 (defonce APP (app/fulcro-app
               {:remotes {:remote (http/fulcro-http-remote {})}}))
 
-(defsc GoalModal [this props]
-  {:query [:ui/modal-id]
-   :ident (fn [] [:ui/modal-id ::test-modal])} 
-  (div (dom/button :.ui.button.yellow.create_btn 
-                   {:onClick (fn []
-                               (when-let [m (-> js/document (.getElementById "test-modal"))]
-                                 (log/info "Button click modal = " m)
-                                 (.show m "show")))} ; See https://semantic-ui.com/modules/modal.html#/usage
-                   "Test Modal")
-       (div :.ui.modal#test-modal 
-            (div :.description
-                 (div :.ui.header "I am wondering how this works...")
-                 (dom/p "...and I'm trying a few things."))
-            (div :.actions
-                 (div :.ui.black.deny.button "Nope")
-                 (div :.ui.positve.right.labeled.icon.button "Yup")))))
-
-(def ui-goal-modal (comp/factory GoalModal))
-
-(fm/defmutation run-test-modal [{:keys [some-text]}]
+(fm/defmutation dismiss-modal [_]
   (action [{:keys [state]}] ; This is typically what you want to do locally. Binding to the state db.
-          (log/info "I would run a function here? some-text=" some-text)
-          #_(-> js/document (.getElementById "TenQuestions"))))
+          (swap! state #(assoc % :ui/modal-visible? false))))
 
-;;; (aget (-> js/document (.getElementById "test-modal")) "click")
+;;; I probably want this to something more, maybe a union. 
+(defsc ModalContent [this props]
+  {:query [:ui/modal-content-id]
+   :ident (fn [] [:ui/modal-content-id ::modal-content])}
+  (div :.ui.container
+       (dom/p "This is my modal's content.")
+       (dom/button :.ui.button.yellow.create_btn 
+                   {:onClick #(comp/transact! this [(dismiss-modal {})])}
+                   "Dismiss")))
 
-;;; NOTE: $ is an alias for jQuery(). $("#test") gets the test div.
-;;; In jQuery, the class and ID selectors are the same as in CSS.
-;;; If you want to select elements with a certain class, use a dot ( . ) and the class name.
-;;; If you want to select elements with a certain ID, use the hash symbol ( # ) and the ID name
-;;; Example JS for running testmodal 
-;;;$(function(){
-;;;	$("#test").click(function(){
-;;;		$(".test").modal('show');
-;;;	});
-;;;	$(".test").modal({
-;;;		closable: true
-;;;	});
-;;;});
+(def ui-modal-content (comp/factory ModalContent))
 
-;;;========================================== CHUI =============================================
 (defn square-coords
   "Return a vector of two integers [rank file] given an id string."
   [id]
@@ -95,6 +71,17 @@
 
 (def ui-board (comp/factory Board))
 
+(defsc ModalWrapper [_ {:ui/keys [modal-visible?]}]
+  {:query [:ui/modal-visible?]
+   :ident (fn [] [:ui/modal-wrapper-id ::modal-wrapper])}
+  ;; For children might use a union, might just use more props. 
+  (ui-modal {:children (ui-modal-content {:ui/modal-content-id ::modal-content})
+             :open modal-visible?}))
+
+(def ui-modal-wrapper (comp/factory ModalWrapper))
+
+(def diag (atom nil))
+
 ;;; (. (. js/document -body) -clientHeight)
 ;;; (. (. js/document -body) -clientWidth)
 ;;; (comp/get-initial-state Root {}) ; Sometimes useful. Not so much here.
@@ -102,13 +89,16 @@
 ;;; which is why they include the :square/id table. That info is needed.
 (defsc Root [_ props]
   {:query [{[:board/id ::board] (comp/get-query Board)}
-           {:square/id (comp/get-query Square)}]
-   :initial-state (fn [_] {:game/turn :white ; Don't put here things df/load!-ed.
+           {:square/id (comp/get-query Square)}
+           {:ui/modal-visible? (comp/get-query ModalWrapper)}]
+   :initial-state (fn [_] {:ui/modal-visible? true ; POD Of course, I don't want this permanently!
+                           :game/turn :white ; Don't put here things df/load!-ed.
                            :game/move 1
                            :game/history []})}
   (div :.ui.container
        (dom/h1 "Chui")
-       (ui-goal-modal {:modal/id "test-modal"})
+       (ui-modal-wrapper {:ui/modal-wrapper-id ::modal-wrapper
+                          :ui/modal-visible? (:ui/modal-visible? props)})
        (ui-board props)))
 
 ;;; POD, On the first call, this loads things that you want to be in the initial state.
@@ -117,7 +107,7 @@
   (app/mount! APP Root "app")
   ;; Don't specify :initial-state for anything you intend to df/load! from the server!
   ;; Use (e.g. Board) to normalize. Use target to put it on the root.
-  (df/load! APP :server/time   nil {:target [:game/start-time]}) ; nil means don't normalize.
+  (df/load! APP :server/time nil {:target [:game/start-time]}) ; nil means don't normalize.
   (df/load! APP [:board/id ::board] Board)
   (js/console.log "Loaded"))
 
